@@ -12,14 +12,14 @@
         }
         .grid {
             display: grid;
-            grid-template-columns: repeat(6, 100px);
-            grid-template-rows: repeat(6, 100px);
+            grid-template-columns: repeat(3, 200px);
+            grid-template-rows: repeat(3, 200px);
             gap: 10px;
             justify-content: center;
         }
         .grid button {
-            width: 100px;
-            height: 100px;
+            width: 200px;
+            height: 200px;
             border: none;
             cursor: pointer;
         }
@@ -39,16 +39,34 @@
     <div class="grid" id="grid"></div>
 
     <script>
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        
+        function playBeep(frequency, duration = 200, volume = 0.2) {
+            const oscillator = audioCtx.createOscillator();
+            const gainNode = audioCtx.createGain();
+            
+            oscillator.type = 'sine';
+            oscillator.frequency.setValueAtTime(frequency, audioCtx.currentTime);
+            gainNode.gain.setValueAtTime(volume, audioCtx.currentTime);
+            
+            oscillator.connect(gainNode);
+            gainNode.connect(audioCtx.destination);
+            
+            oscillator.start();
+            oscillator.stop(audioCtx.currentTime + duration / 1000);
+        }
+
         let level = 1;
         let score = 0;
         let correctClicks = 0;
         let incorrectClicks = 0;
         let baseColor = { r: 0, g: 0, b: 0 };
         let outlierPos = { row: 0, col: 0 };
-        let timeLeft = 30;
+
+        let timeLeft = 90;
         let timerJob = null;
 
-        const gridSize = 6;
+        const gridSize = 3;
         const gridElement = document.getElementById("grid");
         const timerLabel = document.getElementById("timerLabel");
         const infoLabel = document.getElementById("infoLabel");
@@ -60,16 +78,26 @@
         }
 
         function generateColors() {
-            const baseR = Math.floor(Math.random() * 256);
-            const baseG = Math.floor(Math.random() * 256);
-            const baseB = Math.floor(Math.random() * 256);
+            const diff = Math.max(5, 50 - level);
+            const componentToChange = Math.floor(Math.random() * 3);
+            const direction = Math.random() > 0.5 ? 1 : -1;
+            const safeMin = direction === -1 ? diff : 0;
+            const safeMax = direction === 1 ? 255 - diff : 255;
+
+            const baseR = (componentToChange === 0)
+                ? Math.floor(Math.random() * (safeMax - safeMin + 1)) + safeMin
+                : Math.floor(Math.random() * 256);
+            const baseG = (componentToChange === 1)
+                ? Math.floor(Math.random() * (safeMax - safeMin + 1)) + safeMin
+                : Math.floor(Math.random() * 256);
+            const baseB = (componentToChange === 2)
+                ? Math.floor(Math.random() * (safeMax - safeMin + 1)) + safeMin
+                : Math.floor(Math.random() * 256);
+
             baseColor = { r: baseR, g: baseG, b: baseB };
 
-            const diff = Math.max(2, 50 - level * 2);
-            const direction = Math.random() > 0.5 ? 1 : -1;
-            const componentToChange = Math.floor(Math.random() * 3);
             const outlierColor = { ...baseColor };
-            outlierColor[["r", "g", "b"][componentToChange]] = Math.max(0, Math.min(255, outlierColor[["r", "g", "b"][componentToChange]] + direction * diff));
+            outlierColor[["r", "g", "b"][componentToChange]] += direction * diff;
 
             const baseHex = rgbToHex(baseColor.r, baseColor.g, baseColor.b);
             const outlierHex = rgbToHex(outlierColor.r, outlierColor.g, outlierColor.b);
@@ -85,30 +113,28 @@
         function checkOutlier(row, col) {
             if (timeLeft <= 0) return;
 
-            if (row === outlierPos.row && col === outlierPos.col) {
+            const isCorrect = row === outlierPos.row && col === outlierPos.col;
+
+            if (isCorrect) {
+                playBeep(440); // Correct beep (440 Hz)
                 level += 1;
                 score += 1;
                 correctClicks += 1;
             } else {
+                playBeep(1000); // Wrong beep (1000 Hz)
                 level = Math.max(1, level - 1);
                 score = Math.max(0, score - 1);
                 incorrectClicks += 1;
             }
 
-            playGame();
+            setTimeout(playGame, 100); // slight delay to allow beep
         }
 
         function playGame() {
-            // Reset timer
-            timeLeft = 30;
-            updateTimer();
-
-            // Clear the grid
             gridElement.innerHTML = "";
 
             const { baseHex, outlierHex } = generateColors();
 
-            // Create grid buttons
             for (let row = 0; row < gridSize; row++) {
                 for (let col = 0; col < gridSize; col++) {
                     const color = (row === outlierPos.row && col === outlierPos.col) ? outlierHex : baseHex;
@@ -123,30 +149,23 @@
         }
 
         function updateTimer() {
-            if (timerJob !== null) {
-                clearInterval(timerJob);
-            }
-
             timerLabel.innerHTML = `Time Left: ${timeLeft}s`;
 
-            if (timeLeft > 0) {
-                timerJob = setInterval(() => {
-                    timeLeft--;
-                    timerLabel.innerHTML = `Time Left: ${timeLeft}s`;
+            timerJob = setInterval(() => {
+                timeLeft--;
+                timerLabel.innerHTML = `Time Left: ${timeLeft}s`;
 
-                    if (timeLeft <= 0) {
-                        // Time's up: count as incorrect and go to next round
-                        level = Math.max(1, level - 1);
-                        score = Math.max(0, score - 1);
-                        incorrectClicks += 1;
-                        playGame();
-                    }
-                }, 1000);
-            }
+                if (timeLeft <= 0) {
+                    clearInterval(timerJob);
+                    gridElement.innerHTML = ""; // Optional: clear grid
+                    infoLabel.innerHTML += " <strong>Game Over!</strong>";
+                }
+            }, 1000);
         }
 
-        // Start the game when the page is loaded
+        // Start the game and the timer
         playGame();
+        updateTimer();
     </script>
 </body>
 </html>
