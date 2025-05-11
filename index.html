@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Find the Outlier Color</title>
+    <style>
+        body {
+            font-family: Helvetica, sans-serif;
+            text-align: center;
+            margin: 20px;
+        }
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(6, 100px);
+            grid-template-rows: repeat(6, 100px);
+            gap: 10px;
+            justify-content: center;
+        }
+        .grid button {
+            width: 100px;
+            height: 100px;
+            border: none;
+            cursor: pointer;
+        }
+        .timer {
+            font-size: 24px;
+            color: red;
+        }
+        .info {
+            font-size: 18px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Find the Outlier Color</h1>
+    <div class="info" id="infoLabel"></div>
+    <div class="timer" id="timerLabel">Time Left: 30s</div>
+    <div class="grid" id="grid"></div>
+
+    <script>
+        let level = 1;
+        let score = 0;
+        let correctClicks = 0;
+        let incorrectClicks = 0;
+        let baseColor = { r: 0, g: 0, b: 0 };
+        let outlierPos = { row: 0, col: 0 };
+        let timeLeft = 30;
+        let timerJob = null;
+
+        const gridSize = 6;
+        const gridElement = document.getElementById("grid");
+        const timerLabel = document.getElementById("timerLabel");
+        const infoLabel = document.getElementById("infoLabel");
+
+        function updateInfoLabel() {
+            const total = correctClicks + incorrectClicks;
+            const accuracy = total > 0 ? (correctClicks / total) * 100 : 0;
+            infoLabel.innerHTML = `Score: ${score}   Accuracy: ${accuracy.toFixed(1)}%   Correct: ${correctClicks} / ${total}`;
+        }
+
+        function generateColors() {
+            const baseR = Math.floor(Math.random() * 256);
+            const baseG = Math.floor(Math.random() * 256);
+            const baseB = Math.floor(Math.random() * 256);
+            baseColor = { r: baseR, g: baseG, b: baseB };
+
+            const diff = Math.max(2, 50 - level * 2);
+            const direction = Math.random() > 0.5 ? 1 : -1;
+            const componentToChange = Math.floor(Math.random() * 3);
+            const outlierColor = { ...baseColor };
+            outlierColor[["r", "g", "b"][componentToChange]] = Math.max(0, Math.min(255, outlierColor[["r", "g", "b"][componentToChange]] + direction * diff));
+
+            const baseHex = rgbToHex(baseColor.r, baseColor.g, baseColor.b);
+            const outlierHex = rgbToHex(outlierColor.r, outlierColor.g, outlierColor.b);
+
+            outlierPos = { row: Math.floor(Math.random() * gridSize), col: Math.floor(Math.random() * gridSize) };
+            return { baseHex, outlierHex };
+        }
+
+        function rgbToHex(r, g, b) {
+            return "#" + ((1 << 24) | (r << 16) | (g << 8) | b).toString(16).slice(1).toUpperCase();
+        }
+
+        function checkOutlier(row, col) {
+            if (timeLeft <= 0) return;
+
+            if (row === outlierPos.row && col === outlierPos.col) {
+                level += 1;
+                score += 1;
+                correctClicks += 1;
+            } else {
+                level = Math.max(1, level - 1);
+                score = Math.max(0, score - 1);
+                incorrectClicks += 1;
+            }
+
+            playGame();
+        }
+
+        function playGame() {
+            // Reset timer
+            timeLeft = 30;
+            updateTimer();
+
+            // Clear the grid
+            gridElement.innerHTML = "";
+
+            const { baseHex, outlierHex } = generateColors();
+
+            // Create grid buttons
+            for (let row = 0; row < gridSize; row++) {
+                for (let col = 0; col < gridSize; col++) {
+                    const color = (row === outlierPos.row && col === outlierPos.col) ? outlierHex : baseHex;
+                    const button = document.createElement("button");
+                    button.style.backgroundColor = color;
+                    button.onclick = () => checkOutlier(row, col);
+                    gridElement.appendChild(button);
+                }
+            }
+
+            updateInfoLabel();
+        }
+
+        function updateTimer() {
+            if (timerJob !== null) {
+                clearInterval(timerJob);
+            }
+
+            timerLabel.innerHTML = `Time Left: ${timeLeft}s`;
+
+            if (timeLeft > 0) {
+                timerJob = setInterval(() => {
+                    timeLeft--;
+                    timerLabel.innerHTML = `Time Left: ${timeLeft}s`;
+
+                    if (timeLeft <= 0) {
+                        // Time's up: count as incorrect and go to next round
+                        level = Math.max(1, level - 1);
+                        score = Math.max(0, score - 1);
+                        incorrectClicks += 1;
+                        playGame();
+                    }
+                }, 1000);
+            }
+        }
+
+        // Start the game when the page is loaded
+        playGame();
+    </script>
+</body>
+</html>
